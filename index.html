@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>풀파티 수제 빙고</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background-color: #2b2d42; color: #fff; margin: 0; padding: 10px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; box-sizing: border-box; }
+        .container { background-color: #edf2f4; color: #333; padding: 20px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 100%; max-width: 650px; text-align: center; margin-top: 10px; position: relative; overflow: hidden; }
+        
+        /* 공통 버튼 */
+        .btn-primary { background-color: #d90429; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-primary:hover { background-color: #ef233c; transform: translateY(-2px); }
+        .btn-secondary { background-color: #8d99ae; color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+        /* 화면 제어 */
+        #loginScreen, #setupScreen, #waitingScreen, #mainBoard { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
+        #loginScreen { display: flex; padding: 30px 10px; }
+
+        /* 1. 입장 & 작성 화면 */
+        .login-input { padding: 12px; font-size: 1.1rem; border: 2px solid #ef233c; border-radius: 8px; width: 80%; max-width: 300px; margin-bottom: 20px; text-align: center; }
+        .setup-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; max-width: 450px; margin: 15px auto 25px auto; }
+        .setup-input { aspect-ratio: 1/1; text-align: center; border: 2px solid #ccc; border-radius: 8px; font-size: 0.85rem; font-weight: bold; padding: 2px; width: 100%; box-sizing: border-box; }
+        .setup-input:focus { border-color: #d90429; outline: none; background: #fff0f3; }
+
+        /* 3. 대기실 */
+        .wait-list { background: #fff; border-radius: 12px; padding: 15px; width: 100%; max-width: 450px; margin-bottom: 20px; text-align: left; }
+        .wait-item { font-size: 1.1rem; font-weight: bold; margin-bottom: 8px; color: #2b2d42; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }
+
+        /* 4. 메인 게임 (턴 & 빙고판) */
+        .broadcaster { background: #ffb703; color: #000; font-size: 1.2rem; font-weight: 900; padding: 15px; border-radius: 12px; margin-bottom: 15px; width: 100%; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); word-break: keep-all; }
+        .turn-alert { background: #8d99ae; color: #fff; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; width: 100%; box-sizing: border-box; font-size: 1.1rem; transition: 0.3s; }
+        .turn-alert.my-turn { background: #d90429; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); box-shadow: 0 0 15px #d90429; } 100% { transform: scale(1); } }
+
+        .leaderboard { display: flex; flex-wrap: wrap; gap: 8px; background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 15px; width: 100%; box-sizing: border-box; justify-content: center;}
+        .player-badge { background: #edf2f4; border: 1px solid #ccc; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; }
+        .player-badge.active-turn { background: #ffb703; color: #000; border-color: #ffb703; }
+
+        .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; width: 100%; max-width: 450px; margin: 0 auto; }
+        .bingo-cell { background-color: #fff; border: 2px solid #ccc; border-radius: 8px; aspect-ratio: 1 / 1; display: flex; justify-content: center; align-items: center; padding: 2px; font-size: 0.8rem; font-weight: bold; color: #333; cursor: pointer; user-select: none; transition: 0.2s; word-break: break-word; position: relative; overflow: hidden; }
+        .bingo-cell.stamped { background-color: #d90429; border-color: #d90429; color: #fff; transform: scale(0.96); }
+        .bingo-cell.stamped::before { content: '⭕'; position: absolute; font-size: 3rem; opacity: 0.2; color: #fff; }
+
+        /* 실시간 채팅방 */
+        .chat-container { background: #fff; border: 2px solid #8d99ae; border-radius: 12px; padding: 10px; margin-top: 20px; width: 100%; max-width: 450px; box-sizing: border-box; display: flex; flex-direction: column; }
+        .chat-messages { height: 160px; overflow-y: auto; text-align: left; font-size: 0.9rem; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; padding-right: 5px; }
+        .chat-msg { background: #f1f3f5; padding: 6px 10px; border-radius: 12px; width: fit-content; max-width: 85%; word-break: break-word; }
+        .chat-msg.mine { background: #d90429; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .chat-msg.system { background: transparent; color: #888; font-size: 0.8rem; text-align: center; align-self: center; }
+        .chat-sender { font-size: 0.75rem; color: #666; margin-bottom: 2px; margin-left: 2px; }
+        .chat-input-row { display: flex; gap: 5px; }
+        .chat-input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem; }
+        
+        /* 우승자 발표 */
+        #winnerOverlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(217, 4, 41, 0.95); color: white; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 30px; z-index: 10; }
+        .winner-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; width: 90%; max-width: 400px; margin-top: 20px; }
+        .w-cell { background: #fff; color: #333; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; border-radius: 6px; }
+        .w-cell.stamped { background: #ffb703; color: #000; border: 2px solid #fff; }
+
+        @media (max-width: 500px) { .setup-input, .bingo-cell { font-size: 0.65rem; } .broadcaster { font-size: 1rem; } }
+    </style>
+</head>
+<body>
+
+<div class="container" id="loginScreen">
+    <h1 style="color: #d90429; font-size: 2.2rem; margin-bottom: 5px;">🔥 턴제 풀파티 빙고</h1>
+    <p style="color:#666; font-weight: bold;">빨리 작성할수록 먼저 단어를 부릅니다!</p>
+    
+    <div style="background: #2b2d42; color: #fff; padding: 15px; border-radius: 12px; margin: 20px 0; width: 90%;">
+        주제: <span id="loginSubjectText" style="color: #ffb703;">로딩 중...</span>
+    </div>
+    <button class="btn-secondary" style="margin-bottom: 25px;" onclick="pickRandomTopic()">🎲 랜덤 주제 뽑기</button>
+
+    <input type="text" id="playerName" class="login-input" placeholder="닉네임 입력 (예: 홍길동)" required autocomplete="off" onkeypress="if(event.key==='Enter') enterSetup()">
+    <button class="btn-primary" onclick="enterSetup()">입장하여 빙고판 만들기</button>
+</div>
+
+<div class="container" id="setupScreen">
+    <h2 style="color: #d90429; margin-bottom: 5px;">📝 빙고판 25칸 채우기</h2>
+    <p style="color: #555; font-weight: bold;">주제: <span id="setupSubjectText" style="color: #d90429;"></span></p>
+    
+    <div class="setup-grid" id="setupGrid"></div>
+    
+    <button class="btn-primary" style="width: 100%; max-width: 450px;" onclick="submitBoard()">작성 완료 (대기실로 이동)</button>
+    <button onclick="fillTestNumbers()" style="margin-top: 15px; background: transparent; border: none; color: #aaa; text-decoration: underline; cursor: pointer;">(테스트용 자동 채우기)</button>
+</div>
+
+<div class="container" id="waitingScreen">
+    <h2 style="color: #d90429; margin-bottom: 10px;">⏳ 대기실 (모집 중)</h2>
+    <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">모두가 완료하면 아래 시작 버튼을 눌러주세요!<br>(완료 순서대로 턴이 돌아갑니다)</p>
+    
+    <div class="wait-list" id="readyPlayerList">
+        </div>
+
+    <button class="btn-primary" style="background: #ffb703; color: #000; font-size: 1.3rem; padding: 15px 30px;" onclick="startGame()">▶️ 전원 준비완료! 게임 시작</button>
+</div>
+
+<div class="container" id="mainBoard">
+    
+    <div id="winnerOverlay">
+        <h1 style="font-size: 2.5rem; margin-bottom: 10px;">🎉 <span id="winnerNameDisplay">누군가</span> 우승! 🎉</h1>
+        <div class="winner-grid" id="winnerGrid"></div>
+        <button class="btn-secondary" style="margin-top: 25px; background: #2b2d42; padding: 12px 20px;" onclick="resetAllGame()">판 엎고 새 게임 시작</button>
+    </div>
+
+    <div id="turnAlertBox" class="turn-alert">로딩 중...</div>
+    <div class="broadcaster" id="broadcasterDisplay">📢 아직 불린 단어가 없습니다.</div>
+
+    <div class="leaderboard" id="playerList"></div>
+    
+    <div style="display:flex; justify-content: space-between; align-items: center; width: 100%; max-width: 450px; margin: 0 auto 10px auto;">
+        <span style="font-size: 1.2rem; font-weight: bold; color: #d90429;" id="myStatusText">내 빙고: 0줄</span>
+        <button class="btn-secondary" onclick="resetAllGame()" style="font-size:0.8rem; padding: 6px 10px;">전체 초기화</button>
+    </div>
+
+    <div class="bingo-grid" id="bingoGrid"></div>
+
+    <div class="chat-container">
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-row">
+            <input type="text" id="chatInput" class="chat-input" placeholder="메시지 입력..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button class="btn-primary" style="padding: 10px 15px;" onclick="sendChat()">전송</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Firebase 설정
+    const firebaseConfig = {
+        apiKey: "AIzaSyBZmxJUr5oaZttF7oIYJSEBb5RgjVQjInY",
+        authDomain: "cofirm-board.firebaseapp.com",
+        databaseURL: "https://cofirm-board-default-rtdb.firebaseio.com", 
+        projectId: "cofirm-board",
+        storageBucket: "cofirm-board.firebasestorage.app",
+        messagingSenderId: "367825644618",
+        appId: "1:367825644618:web:3f236c72c07d5347878ab3"
+    };
+
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const gameRef = db.ref('turn_bingo'); 
+    const chatRef = db.ref('turn_bingo/chat');
+    
+    let myName = ""; 
+    let myBoardRef = null;
+    let turnOrderList = [];
+    let currentTurnPlayer = "";
+
+    // 💡 주제 룰렛
+    const topicList = ["영화 제목", "나라 이름", "드라마 제목", "동물 이름", "과일/채소", "연예인", "음식", "아이스크림", "게임 이름", "회사 사람 이름"];
+    function pickRandomTopic() {
+        gameRef.child('subject').set(topicList[Math.floor(Math.random() * topicList.length)]);
+    }
+    gameRef.child('subject').on('value', (snap) => {
+        const sub = snap.val() || "자유 주제";
+        document.getElementById('loginSubjectText').innerText = sub;
+        document.getElementById('setupSubjectText').innerText = sub;
+    });
+
+    // 2. 작성 화면 진입
+    function enterSetup() {
+        const val = document.getElementById('playerName').value.trim();
+        if(!val) { alert("닉네임을 입력하세요!"); return; }
+        myName = val;
+        myBoardRef = gameRef.child('players').child(myName);
+
+        myBoardRef.once('value', (snap) => {
+            const data = snap.val();
+            if (data && data.ready) {
+                // 이미 준비 완료면 메인이나 대기실로 (상태에 따라 다름)
+                gameRef.child('state').once('value', stateSnap => {
+                    if(stateSnap.val() && stateSnap.val().isStarted) {
+                        document.getElementById('loginScreen').style.display = 'none';
+                        document.getElementById('mainBoard').style.display = 'flex';
+                        startMainGameListeners();
+                    } else {
+                        document.getElementById('loginScreen').style.display = 'none';
+                        document.getElementById('waitingScreen').style.display = 'flex';
+                        listenToWaitingRoom();
+                    }
+                });
+            } else {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('setupScreen').style.display = 'flex';
+                
+                const grid = document.getElementById('setupGrid');
+                grid.innerHTML = '';
+                for(let i=0; i<25; i++) {
+                    const input = document.createElement('input');
+                    input.type = 'text'; input.className = 'setup-input'; input.id = `input_cell_${i}`;
+                    input.onkeypress = (e) => { if(e.key === 'Enter') { const n = document.getElementById(`input_cell_${i+1}`); if(n) n.focus(); } };
+                    grid.appendChild(input);
+                }
+            }
+        });
+    }
+
+    // 3. 빙고판 제출 및 대기실 이동
+    function submitBoard() {
+        const newBoard = {};
+        for(let i=0; i<25; i++) {
+            const val = document.getElementById(`input_cell_${i}`).value.trim();
+            if(!val) { alert(`25칸을 모두 채워주세요! (빈 칸: ${i+1}번째)`); return; }
+            newBoard[i] = { text: val, stamped: false };
+        }
+
+        // 서버시간으로 준비 완료 기록 (이 순서대로 턴 정함)
+        myBoardRef.set({ 
+            ready: true, 
+            readyAt: firebase.database.ServerValue.TIMESTAMP, 
+            lines: 0, 
+            board: newBoard 
+        });
+
+        chatRef.push({ type: 'system', msg: `[${myName}]님이 빙고판 작성을 완료했습니다!` });
+
+        document.getElementById('setupScreen').style.display = 'none';
+        document.getElementById('waitingScreen').style.display = 'flex';
+        listenToWaitingRoom();
+    }
+
+    // 4. 대기실 현황 감시 및 게임 시작
+    function listenToWaitingRoom() {
+        gameRef.child('players').on('value', (snap) => {
+            const players = snap.val();
+            const listObj = document.getElementById('readyPlayerList');
+            if(!listObj) return;
+            
+            listObj.innerHTML = '';
+            let sortedPlayers = [];
+            for(let key in players) {
+                if(players[key].ready) {
+                    sortedPlayers.push({ name: key, time: players[key].readyAt });
+                }
+            }
+            // 빨리 준비한 순으로 정렬
+            sortedPlayers.sort((a,b) => a.time - b.time);
+            
+            sortedPlayers.forEach((p, idx) => {
+                const div = document.createElement('div');
+                div.className = 'wait-item';
+                div.innerText = `${idx + 1}번째 턴: ${p.name}`;
+                listObj.appendChild(div);
+            });
+        });
+
+        // 게임 시작 감지
+        gameRef.child('state').on('value', (snap) => {
+            if(snap.val() && snap.val().isStarted) {
+                document.getElementById('waitingScreen').style.display = 'none';
+                document.getElementById('mainBoard').style.display = 'flex';
+                gameRef.child('players').off(); // 대기실 리스너 종료
+                startMainGameListeners();
+            }
+        });
+    }
+
+    function startGame() {
+        gameRef.child('players').once('value', (snap) => {
+            const players = snap.val();
+            let sortedNames = [];
+            for(let key in players) { if(players[key].ready) sortedNames.push({ name: key, time: players[key].readyAt }); }
+            sortedNames.sort((a,b) => a.time - b.time);
+            const turnOrder = sortedNames.map(p => p.name);
+
+            if(turnOrder.length < 2) {
+                if(!confirm("혼자서 시작하시겠습니까? (최소 2명 권장)")) return;
+            }
+
+            gameRef.child('state').set({
+                isStarted: true,
+                turnOrder: turnOrder,
+                turnIndex: 0,
+                lastCalledWord: "아직 없음",
+                lastCaller: "알림"
+            });
+            
+            chatRef.push({ type: 'system', msg: `🔥 게임이 시작되었습니다! 첫 턴은 [${turnOrder[0]}]님입니다.` });
+        });
+    }
+
+    // 5. 메인 게임 로직
+    function startMainGameListeners() {
+        // [내 빙고판 렌더링 & 클릭 처리]
+        myBoardRef.child('board').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if(!data) return;
+
+            const gridElement = document.getElementById('bingoGrid');
+            gridElement.innerHTML = '';
+            let cellArray = [];
+
+            for (let i = 0; i < 25; i++) {
+                const cellData = data[i];
+                cellArray.push(cellData);
+                const cell = document.createElement('div');
+                cell.className = cellData.stamped ? 'bingo-cell stamped' : 'bingo-cell';
+                cell.innerText = cellData.text;
+                
+                cell.onclick = () => {
+                    const isNowStamped = !cellData.stamped;
+                    // 도장 찍기 (무조건 내 판에는 찍힘)
+                    myBoardRef.child('board').child(i).update({ stamped: isNowStamped });
+
+                    // 🔥 내 차례인데 '새로운 단어'를 찍었을 때만 확성기 방송 + 턴 넘김!
+                    if (currentTurnPlayer === myName && isNowStamped) {
+                        if(confirm(`[ ${cellData.text} ](을)를 외치시겠습니까? 턴이 넘어갑니다.`)) {
+                            // 확성기 전송 및 턴 증가
+                            gameRef.child('state').once('value', snap => {
+                                const st = snap.val();
+                                const nextIndex = (st.turnIndex + 1) % st.turnOrder.length;
+                                gameRef.child('state').update({
+                                    lastCalledWord: cellData.text,
+                                    lastCaller: myName,
+                                    turnIndex: nextIndex
+                                });
+                            });
+                        } else {
+                            // 취소하면 찍었던 도장 다시 원상복구
+                            myBoardRef.child('board').child(i).update({ stamped: false });
+                        }
+                    }
+                };
+                gridElement.appendChild(cell);
+            }
+            checkMyBingo(cellArray);
+        });
+
+        // [턴 및 상태 감시]
+        gameRef.child('state').on('value', (snapshot) => {
+            const state = snapshot.val();
+            if(!state) return;
+
+            turnOrderList = state.turnOrder || [];
+            currentTurnPlayer = turnOrderList[state.turnIndex];
+
+            // UI 업데이트: 차례 알림
+            const alertBox = document.getElementById('turnAlertBox');
+            if (currentTurnPlayer === myName) {
+                alertBox.className = "turn-alert my-turn";
+                alertBox.innerText = `🚨 내 차례입니다! 부를 단어를 클릭하세요! 🚨`;
+                if(navigator.vibrate) navigator.vibrate(200); // 폰 진동 피드백
+            } else {
+                alertBox.className = "turn-alert";
+                alertBox.innerText = `현재 차례: [ ${currentTurnPlayer} ]님 (고민 중...)`;
+            }
+
+            // UI 업데이트: 확성기 (방금 부른 단어)
+            if (state.lastCalledWord !== "아직 없음") {
+                document.getElementById('broadcasterDisplay').innerHTML = `📢 <b>${state.lastCaller}</b>님의 외침!<br><span style="color:#d90429; font-size:1.5rem;">[ ${state.lastCalledWord} ]</span>`;
+            }
+
+            // 우승자 체크
+            if (state.isGameOver) {
+                document.getElementById('winnerOverlay').style.display = 'flex';
+                document.getElementById('winnerNameDisplay').innerText = state.winnerName;
+                gameRef.child('players').child(state.winnerName).child('board').once('value', (bSnap) => {
+                    const wBoard = bSnap.val();
+                    const wGrid = document.getElementById('winnerGrid');
+                    wGrid.innerHTML = '';
+                    if(wBoard) {
+                        for(let i=0; i<25; i++) {
+                            const d = document.createElement('div');
+                            d.className = wBoard[i].stamped ? 'w-cell stamped' : 'w-cell';
+                            d.innerText = wBoard[i].text;
+                            wGrid.appendChild(d);
+                        }
+                    }
+                });
+            }
+        });
+
+        // [리더보드 렌더링]
+        gameRef.child('players').on('value', (snapshot) => {
+            const players = snapshot.val();
+            const listObj = document.getElementById('playerList');
+            listObj.innerHTML = '';
+            
+            // turnOrderList 순서대로 렌더링
+            turnOrderList.forEach(pName => {
+                if(!players[pName]) return;
+                const lines = players[pName].lines || 0;
+                const span = document.createElement('span');
+                
+                span.className = (pName === currentTurnPlayer) ? "player-badge active-turn" : "player-badge";
+                span.innerText = `${pName}: ${lines}줄`;
+                listObj.appendChild(span);
+            });
+        });
+
+        // [채팅 시스템 시작]
+        startChat();
+    }
+
+    // 6. 빙고 계산기
+    function checkMyBingo(cells) {
+        if(cells.length < 25) return;
+        let lines = 0;
+        for (let r = 0; r < 5; r++) { if (cells[r*5].stamped && cells[r*5+1].stamped && cells[r*5+2].stamped && cells[r*5+3].stamped && cells[r*5+4].stamped) lines++; }
+        for (let c = 0; c < 5; c++) { if (cells[c].stamped && cells[c+5].stamped && cells[c+10].stamped && cells[c+15].stamped && cells[c+20].stamped) lines++; }
+        if (cells[0].stamped && cells[6].stamped && cells[12].stamped && cells[18].stamped && cells[24].stamped) lines++;
+        if (cells[4].stamped && cells[8].stamped && cells[12].stamped && cells[16].stamped && cells[20].stamped) lines++;
+
+        document.getElementById('myStatusText').innerText = `내 빙고: ${lines}줄`;
+        myBoardRef.update({ lines: lines });
+
+        if (lines >= 5) {
+            gameRef.child('state').once('value', snap => {
+                const st = snap.val();
+                if(!st || !st.isGameOver) {
+                    gameRef.child('state').update({ isGameOver: true, winnerName: myName });
+                    chatRef.push({ type: 'system', msg: `🎉🎉 [${myName}]님이 5빙고를 달성하여 우승했습니다! 🎉🎉` });
+                }
+            });
+        }
+    }
+
+    // 7. 실시간 채팅 로직
+    function startChat() {
+        const chatBox = document.getElementById('chatMessages');
+        chatRef.on('child_added', (snap) => {
+            const data = snap.val();
+            const div = document.createElement('div');
+            
+            if(data.type === 'system') {
+                div.className = 'chat-msg system';
+                div.innerText = data.msg;
+            } else {
+                div.className = data.sender === myName ? 'chat-msg mine' : 'chat-msg';
+                if(data.sender !== myName) {
+                    const nameLabel = document.createElement('div');
+                    nameLabel.className = 'chat-sender';
+                    nameLabel.innerText = data.sender;
+                    div.appendChild(nameLabel);
+                }
+                const msgSpan = document.createElement('span');
+                msgSpan.innerText = data.msg;
+                div.appendChild(msgSpan);
+            }
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight; // 스크롤 맨 아래로
+        });
+    }
+
+    window.sendChat = function() {
+        const input = document.getElementById('chatInput');
+        const txt = input.value.trim();
+        if(txt) {
+            chatRef.push({ type: 'user', sender: myName, msg: txt });
+            input.value = '';
+        }
+    }
+
+    // 8. 초기화 및 테스트 채우기
+    window.resetAllGame = function() {
+        if(!confirm("진짜로 게임을 폭파하고 새로 시작하시겠습니까? (대기실부터 시작됩니다)")) return;
+        gameRef.remove().then(() => {
+            alert("초기화 완료! F5를 눌러주세요.");
+            location.reload();
+        });
+    }
+
+    function fillTestNumbers() {
+        let nums = Array.from({length: 25}, (_, i) => "테스트_" + (i + 1));
+        nums.sort(() => Math.random() - 0.5);
+        for(let i=0; i<25; i++) { document.getElementById(`input_cell_${i}`).value = nums[i]; }
+    }
+</script>
+
+</body>
+</html>
