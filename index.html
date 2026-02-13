@@ -370,16 +370,19 @@
         if(input.value.trim()) { chatRef.push({ type: 'user', sender: myName, msg: input.value.trim() }); input.value = ''; }
     }
 
+// 테스트 데이터 자동 입력 함수 추가
+function fillTestNumbers() {
+    for (let i = 0; i < 25; i++) {
+        const cell = document.getElementById(`input_cell_${i}`);
+        if (cell) {
+            cell.value = i + 1; // 1부터 25까지 숫자를 자동으로 채움
+        }
+    }
+    console.log("테스트 데이터가 입력되었습니다.");
+}
+    
     
     window.resetAllGame = function() { if(confirm("전체 초기화하시겠습니까?")) gameRef.remove().then(() => location.reload()); }
-
-    // 🔥 [이 부분이 사라졌었습니다!] 자동 입력 함수 다시 추가
-    function fillTestNumbers() { 
-        for(let i=0; i<25; i++) { 
-            const input = document.getElementById(`input_cell_${i}`);
-            if(input) input.value = "키워드_" + (i + 1); 
-        }
-        
  // 기존의 마지막 함수를 아래와 같이 수정 (쉼표 추가 및 범위 수정)
 function pickRandomTopic() { 
     const topics = ["드라마", "과일", "나라이름", "우리나라 도시", "영화제목", "과자", "애니메이션", "두글자단어", "숫자", "알파벳", "색깔"];
@@ -389,8 +392,5 @@ function pickRandomTopic() {
 </script>
 </body>
 </html>
-
-
-
 
 
