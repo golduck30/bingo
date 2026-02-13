@@ -369,9 +369,11 @@
         const input = document.getElementById('chatInput');
         if(input.value.trim()) { chatRef.push({ type: 'user', sender: myName, msg: input.value.trim() }); input.value = ''; }
     }
+
     
     window.resetAllGame = function() { if(confirm("전체 초기화하시겠습니까?")) gameRef.remove().then(() => location.reload()); }
-    function pickRandomTopic() { 
+ // 기존의 마지막 함수를 아래와 같이 수정 (쉼표 추가 및 범위 수정)
+function pickRandomTopic() { 
     const topics = ["드라마", "과일", "나라이름", "우리나라 도시", "영화제목", "과자", "애니메이션", "두글자단어", "숫자", "알파벳", "색깔"];
     const randomTopic = topics[Math.floor(Math.random() * topics.length)];
     gameRef.child('subject').set(randomTopic); 
@@ -379,5 +381,6 @@
 </script>
 </body>
 </html>
+
 
 
