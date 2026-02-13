@@ -45,7 +45,7 @@
         .btn-call:disabled { background-color: #ccc; cursor: not-allowed; }
         .btn-me-too { background-color: #1a73e8; color: white; border: none; padding: 12px; border-radius: 12px; font-weight: bold; cursor: pointer; flex: 1; font-size: 1rem; }
 
-        .login-input, .setup-input, .chat-input { padding: 12px 16px; font-size: 1rem; border: 1px solid var(--gemini-border); border-radius: 24px; width: 100%; box-sizing: border-box; outline: none; background: var(--gemini-bg); color: var(--gemini-text);}
+        .login-input, .setup-input, .chat-input { padding: 12px 16px; font-size: 1rem; border: 1px solid var(--gemini-border); border-radius: 24px; width: 100%; box-sizing: border-box; outline: none; transition: 0.2s; background: var(--gemini-bg); color: var(--gemini-text);}
         #loginScreen, #setupScreen, #waitingScreen, #mainBoard { display: none; flex-direction: column; width: 100%; } #loginScreen { display: flex; }
 
         .setup-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; margin: 20px 0; }
@@ -70,7 +70,7 @@
         .chat-messages { flex: 1; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 10px; }
         .chat-msg { display: flex; flex-direction: column; max-width: 85%; }
         .chat-msg.mine { align-self: flex-end; align-items: flex-end; }
-        .chat-sender { font-size: 0.75rem; color: var(--gemini-subtext); margin-bottom: 2px; }
+        .chat-sender { font-size: 0.75rem; color: var(--gemini-subtext); margin-bottom: 4px; }
         .chat-bubble { background: var(--gemini-sidebar); padding: 8px 12px; border-radius: 16px; border-top-left-radius: 4px; color: var(--gemini-text); font-size: 0.9rem; }
         .chat-msg.mine .chat-bubble { background: var(--gemini-light-blue); border-radius: 16px; border-top-right-radius: 4px; }
         
@@ -91,7 +91,7 @@
 
     <div class="main-content">
         <div class="container" id="loginScreen">
-            <h1>오늘의 업무 협업 세션을 시작합니다.</h1>
+            <h1>안녕하세요, <br>오늘의 업무 협업 세션을 시작합니다.</h1>
             <div class="subject-box">주제: <strong id="loginSubjectText" style="margin-left: 5px; color: var(--gemini-blue);">데이터 연결 중...</strong></div>
             <div style="display: flex; gap: 10px; width: 100%;">
                 <input type="text" id="playerName" class="login-input" placeholder="닉네임 입력" onkeypress="if(event.key==='Enter') enterSetup()">
@@ -159,7 +159,7 @@
     const gameRef = db.ref('turn_bingo'); 
     const chatRef = db.ref('turn_bingo/chat');
     
-    let myName = "", myBoardRef = null, turnOrderList = [], currentTurnPlayer = "";
+    let myName = "", myBoardRef = null, turnOrderList = [], currentTurnPlayer = "", isChatActive = false;
     let lastSelectedWord = ""; // 방금 내가 클릭해서 체크한 단어 저장
 
     gameRef.child('subject').on('value', snap => {
@@ -306,7 +306,7 @@
         }
         if(b[0].stamped && b[6].stamped && b[12].stamped && b[18].stamped && b[24].stamped) lines++;
         if(b[4].stamped && b[8].stamped && b[12].stamped && b[16].stamped && b[20].stamped) lines++;
-        document.getElementById('myStatusText').innerText = `내 진행도: ${lines*20}%`;
+        document.getElementById('myStatusText').innerText = `내 진행도: ${lines*20}% 완료`;
         myBoardRef.update({ lines: lines });
         if(lines >= 5) gameRef.child('state').update({ isGameOver: true, winnerName: myName });
     }
