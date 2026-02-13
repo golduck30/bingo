@@ -60,4 +60,398 @@
 
         .leaderboard { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
         .player-badge { background: var(--gemini-sidebar); border: 1px solid var(--gemini-border); padding: 4px 12px; border-radius: 16px; font-size: 0.85rem; color: var(--gemini-subtext); }
-        .player-badge.active-turn { background: var(--gemini-light-blue); color: var(--gemini-blue); border-color: var(--gemini-blue); font-weight: 6
+        .player-badge.active-turn { background: var(--gemini-light-blue); color: var(--gemini-blue); border-color: var(--gemini-blue); font-weight: 600; }
+
+        .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--gemini-border); border: 1px solid var(--gemini-border); border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+        .bingo-cell { background-color: var(--gemini-bg); aspect-ratio: 1 / 1; display: flex; justify-content: center; align-items: center; padding: 4px; font-size: 0.85rem; color: var(--gemini-text); cursor: pointer; user-select: none; transition: 0.2s; word-break: break-word; position: relative; text-align: center; }
+        .bingo-cell:hover { background-color: var(--gemini-hover); }
+        
+        @keyframes shake-not-turn { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); background: #fff0f0; } 75% { transform: translateX(3px); background: #fff0f0; } }
+        .bingo-cell.shake-it { animation: shake-not-turn 0.3s; cursor: not-allowed; color: #d93025; }
+
+        .bingo-cell.stamped { background-color: var(--gemini-light-blue); color: var(--gemini-blue); font-weight: 600; }
+        .bingo-cell.stamped::after { content: '✓'; position: absolute; top: 2px; right: 4px; font-size: 1rem; color: var(--gemini-blue); opacity: 0.7; }
+
+        .chat-container { border-top: 1px solid var(--gemini-border); padding-top: 20px; display: flex; flex-direction: column; height: 300px; }
+        .chat-messages { flex: 1; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 15px; }
+        .chat-msg { display: flex; flex-direction: column; max-width: 85%; }
+        .chat-msg.mine { align-self: flex-end; align-items: flex-end; }
+        .chat-sender { font-size: 0.8rem; color: var(--gemini-subtext); margin-bottom: 4px; }
+        .chat-bubble { background: var(--gemini-sidebar); padding: 10px 15px; border-radius: 18px; border-top-left-radius: 4px; color: var(--gemini-text); line-height: 1.4; }
+        .chat-msg.mine .chat-bubble { background: var(--gemini-light-blue); color: var(--gemini-text); border-radius: 18px; border-top-right-radius: 4px; }
+        .chat-msg.system { align-self: center; background: transparent; color: var(--gemini-subtext); font-size: 0.85rem; text-align: center; margin: 10px 0; }
+        
+        .chat-input-row { display: flex; gap: 10px; margin-top: 15px; align-items: center; background: var(--gemini-bg); padding: 5px; border-radius: 30px; border: 1px solid var(--gemini-border); }
+        .chat-input { border: none; padding: 10px 15px; flex: 1; border-radius: 0; background: transparent; }
+        .chat-input:focus { box-shadow: none; }
+        .btn-send { background: transparent; border: none; color: var(--gemini-blue); cursor: pointer; padding: 10px; display: flex; align-items: center; }
+        
+        #winnerOverlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); color: var(--gemini-text); flex-direction: column; align-items: center; justify-content: center; z-index: 10; padding: 20px; box-sizing: border-box; backdrop-filter: blur(5px); }
+        .winner-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--gemini-border); border: 1px solid var(--gemini-border); width: 100%; max-width: 400px; margin: 20px 0; }
+        .w-cell { background: var(--gemini-bg); aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; padding: 2px; text-align: center; }
+        .w-cell.stamped { background: var(--gemini-light-blue); color: var(--gemini-blue); font-weight: bold; }
+
+        @media (max-width: 500px) { .setup-input, .bingo-cell { font-size: 0.75rem; } }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="fake-header">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" fill="#1a73e8"/></svg>
+        <span>Gemini Advanced (업무 보조)</span>
+    </div>
+
+    <div class="main-content">
+        <div class="container" id="loginScreen">
+            <h1>안녕하세요, <br>오늘의 업무 협업 세션을 시작합니다.</h1>
+            <p>참여를 위해 닉네임을 입력해주세요.</p>
+            
+            <div class="subject-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="#444746" style="margin-right:10px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                현재 세션 주제: <strong id="loginSubjectText" style="margin-left: 5px; color: var(--gemini-blue);">데이터 연결 중...</strong>
+            </div>
+            <button class="btn-secondary" style="margin-bottom: 25px; width: fit-content;" onclick="pickRandomTopic()">주제 새로고침</button>
+
+            <div style="display: flex; gap: 10px; width: 100%;">
+                <input type="text" id="playerName" class="login-input" placeholder="닉네임 입력" required autocomplete="off" onkeypress="if(event.key==='Enter') enterSetup()">
+                <button class="btn-primary" onclick="enterSetup()">세션 참여</button>
+            </div>
+        </div>
+
+        <div class="container" id="setupScreen">
+            <h2>데이터 입력 단계</h2>
+            <p>주제에 맞는 키워드 25개를 입력하여 데이터셋을 구성해주세요.<br>주제: <strong id="setupSubjectText" style="color: var(--gemini-blue);"></strong></p>
+            
+            <div class="setup-grid" id="setupGrid"></div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+                <button onclick="fillTestNumbers()" style="background: transparent; border: none; color: var(--gemini-subtext); cursor: pointer; font-size: 0.9rem;">(테스트 데이터 자동 입력)</button>
+                <button class="btn-primary" onclick="submitBoard()">입력 완료</button>
+            </div>
+        </div>
+
+        <div class="container" id="waitingScreen">
+            <h2>참여자 대기 중</h2>
+            <p>모든 참여자가 데이터 입력을 완료하면 세션이 시작됩니다.<br>입력 완료 순서대로 발언권(턴)이 부여됩니다.</p>
+            
+            <div class="wait-list" id="readyPlayerList"></div>
+
+            <button class="btn-primary" style="width: 100%;" onclick="startGame()">모든 참여자 준비 완료, 세션 시작</button>
+        </div>
+
+        <div class="container" id="mainBoard">
+            
+            <div id="winnerOverlay">
+                <h2 style="color: var(--gemini-blue);">🎉 세션 목표 달성!</h2>
+                <p><strong id="winnerNameDisplay">누군가</strong>님이 가장 먼저 데이터를 완성했습니다.</p>
+                <div class="winner-grid" id="winnerGrid"></div>
+                <button class="btn-secondary" style="margin-top: 25px;" onclick="resetAllGame()">새 세션 시작</button>
+            </div>
+
+            <div id="turnAlertBox" class="turn-alert">시스템 상태 확인 중...</div>
+            <div class="broadcaster">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="#1a73e8" style="margin-right: 10px; min-width: 24px;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                <div id="broadcasterDisplay">최근 공유된 키워드가 없습니다.</div>
+            </div>
+
+            <div class="leaderboard" id="playerList"></div>
+            
+            <div style="display:flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px;">
+                <span style="font-weight: 500; color: var(--gemini-blue);" id="myStatusText">내 진행도: 0%</span>
+                <button class="btn-secondary" onclick="resetAllGame()" style="font-size:0.8rem; padding: 4px 10px;">세션 초기화</button>
+            </div>
+
+            <div class="bingo-grid" id="bingoGrid"></div>
+
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-row">
+                    <input type="text" id="chatInput" class="chat-input" placeholder="메시지 입력..." onkeypress="if(event.key==='Enter') sendChat()">
+                    <button class="btn-send" onclick="sendChat()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 💡 1. 앗! 빠져있던 databaseURL 한 줄을 다시 추가했습니다.
+    const firebaseConfig = {
+        apiKey: "AIzaSyBZmxJUr5oaZttF7oIYJSEBb5RgjVQjInY",
+        authDomain: "cofirm-board.firebaseapp.com",
+        databaseURL: "https://cofirm-board-default-rtdb.firebaseio.com", // 👈 바로 이 녀석!
+        projectId: "cofirm-board",
+        storageBucket: "cofirm-board.firebasestorage.app",
+        messagingSenderId: "367825644618",
+        appId: "1:367825644618:web:3f236c72c07d5347878ab3",
+        measurementId: "G-N4QY18DHPX"
+    };
+
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    
+    // 💡 2. 기존 데이터 주소 그대로 사용! (turn_bingo 경로 유지)
+    const gameRef = db.ref('turn_bingo'); 
+    const chatRef = db.ref('turn_bingo/chat');
+    
+    let myName = ""; 
+    let myBoardRef = null;
+    let turnOrderList = [];
+    let currentTurnPlayer = "";
+
+    // 💡 주제 룰렛 (재밌는 일반 주제들로 구성)
+    const topicList = ["영화 제목 (한국/외국)", "나라 이름", "드라마 제목", "동물 이름", "과일과 채소", "유명 연예인 이름", "유명한 노래 제목", "음식/요리 이름", "스포츠 종목", "아이스크림 이름", "게임 이름"];
+    
+    function pickRandomTopic() {
+        gameRef.child('subject').set(topicList[Math.floor(Math.random() * topicList.length)]);
+    }
+    
+    gameRef.child('subject').on('value', (snap) => {
+        // 기존 방에 데이터가 있으면 불러오고, 없으면 첫 주제를 고정
+        const sub = snap.val() || "영화 제목 (한국/외국)";
+        document.getElementById('loginSubjectText').innerText = sub;
+        document.getElementById('setupSubjectText').innerText = sub;
+    });
+
+    // 작성 화면 진입
+    function enterSetup() {
+        const val = document.getElementById('playerName').value.trim();
+        if(!val) { alert("닉네임을 입력하세요."); return; }
+        myName = val;
+        myBoardRef = gameRef.child('players').child(myName);
+
+        myBoardRef.once('value', (snap) => {
+            const data = snap.val();
+            if (data && data.ready) {
+                gameRef.child('state').once('value', stateSnap => {
+                    if(stateSnap.val() && stateSnap.val().isStarted) {
+                        document.getElementById('loginScreen').style.display = 'none';
+                        document.getElementById('mainBoard').style.display = 'flex';
+                        startMainGameListeners();
+                    } else {
+                        document.getElementById('loginScreen').style.display = 'none';
+                        document.getElementById('waitingScreen').style.display = 'flex';
+                        listenToWaitingRoom();
+                    }
+                });
+            } else {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('setupScreen').style.display = 'flex';
+                
+                const grid = document.getElementById('setupGrid');
+                grid.innerHTML = '';
+                for(let i=0; i<25; i++) {
+                    const input = document.createElement('input');
+                    input.type = 'text'; input.className = 'setup-input'; input.id = `input_cell_${i}`;
+                    input.onkeypress = (e) => { if(e.key === 'Enter') { const n = document.getElementById(`input_cell_${i+1}`); if(n) n.focus(); } };
+                    grid.appendChild(input);
+                }
+            }
+        });
+    }
+
+    // 빙고판 제출
+    function submitBoard() {
+        const newBoard = {};
+        for(let i=0; i<25; i++) {
+            const val = document.getElementById(`input_cell_${i}`).value.trim();
+            if(!val) { alert(`${i+1}번째 칸의 데이터가 비어있습니다.`); return; }
+            newBoard[i] = { text: val, stamped: false };
+        }
+        myBoardRef.set({ ready: true, readyAt: firebase.database.ServerValue.TIMESTAMP, lines: 0, board: newBoard });
+        chatRef.push({ type: 'system', msg: `[${myName}]님이 데이터셋 입력을 완료했습니다.` });
+        document.getElementById('setupScreen').style.display = 'none';
+        document.getElementById('waitingScreen').style.display = 'flex';
+        listenToWaitingRoom();
+    }
+
+    // 대기실
+    function listenToWaitingRoom() {
+        gameRef.child('players').on('value', (snap) => {
+            const players = snap.val();
+            const listObj = document.getElementById('readyPlayerList');
+            if(!listObj) return;
+            listObj.innerHTML = '';
+            let sortedPlayers = [];
+            for(let key in players) { if(players[key].ready) sortedPlayers.push({ name: key, time: players[key].readyAt }); }
+            sortedPlayers.sort((a,b) => a.time - b.time);
+            sortedPlayers.forEach((p, idx) => {
+                const div = document.createElement('div');
+                div.className = 'wait-item';
+                div.innerText = `${idx + 1}순위: ${p.name}`;
+                listObj.appendChild(div);
+            });
+        });
+        gameRef.child('state').on('value', (snap) => {
+            if(snap.val() && snap.val().isStarted) {
+                document.getElementById('waitingScreen').style.display = 'none';
+                document.getElementById('mainBoard').style.display = 'flex';
+                gameRef.child('players').off(); 
+                startMainGameListeners();
+            }
+        });
+    }
+
+    function startGame() {
+        gameRef.child('players').once('value', (snap) => {
+            const players = snap.val();
+            let sortedNames = [];
+            for(let key in players) { if(players[key].ready) sortedNames.push({ name: key, time: players[key].readyAt }); }
+            sortedNames.sort((a,b) => a.time - b.time);
+            const turnOrder = sortedNames.map(p => p.name);
+            if(turnOrder.length < 1) return alert("참여자가 없습니다.");
+            gameRef.child('state').set({ isStarted: true, turnOrder: turnOrder, turnIndex: 0, lastCalledWord: "", lastCaller: "" });
+            chatRef.push({ type: 'system', msg: `세션이 시작되었습니다. 첫 발언자는 [${turnOrder[0]}]님입니다.` });
+        });
+    }
+
+    // 메인 게임 로직
+    function startMainGameListeners() {
+        // [내 빙고판 렌더링 & 클릭 처리] 
+        myBoardRef.child('board').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if(!data) return;
+            const gridElement = document.getElementById('bingoGrid');
+            gridElement.innerHTML = '';
+            let cellArray = [];
+            for (let i = 0; i < 25; i++) {
+                const cellData = data[i];
+                cellArray.push(cellData);
+                const cell = document.createElement('div');
+                cell.className = cellData.stamped ? 'bingo-cell stamped' : 'bingo-cell';
+                cell.innerText = cellData.text;
+                
+                cell.onclick = () => {
+                    // 🔒 내 턴이 아니면 클릭 막기
+                    if (currentTurnPlayer !== myName) {
+                        cell.classList.add('shake-it');
+                        setTimeout(() => cell.classList.remove('shake-it'), 500);
+                        return;
+                    }
+
+                    const isNowStamped = !cellData.stamped;
+                    myBoardRef.child('board').child(i).update({ stamped: isNowStamped });
+
+                    if (isNowStamped) {
+                        if(confirm(`'${cellData.text}' 키워드를 공유하시겠습니까?\n(공유 시 다음 참여자로 턴이 넘어갑니다.)`)) {
+                            gameRef.child('state').once('value', snap => {
+                                const st = snap.val();
+                                const nextIndex = (st.turnIndex + 1) % st.turnOrder.length;
+                                gameRef.child('state').update({ lastCalledWord: cellData.text, lastCaller: myName, turnIndex: nextIndex });
+                            });
+                        } else {
+                            myBoardRef.child('board').child(i).update({ stamped: false });
+                        }
+                    }
+                };
+                gridElement.appendChild(cell);
+            }
+            checkMyBingo(cellArray);
+        });
+
+        // [턴 및 상태 감시]
+        gameRef.child('state').on('value', (snapshot) => {
+            const state = snapshot.val();
+            if(!state) return;
+            turnOrderList = state.turnOrder || [];
+            currentTurnPlayer = turnOrderList[state.turnIndex];
+
+            const alertBox = document.getElementById('turnAlertBox');
+            if (currentTurnPlayer === myName) {
+                alertBox.className = "turn-alert my-turn";
+                alertBox.innerText = `현재 귀하의 발언 차례입니다. 키워드를 선택해주세요.`;
+            } else {
+                alertBox.className = "turn-alert";
+                alertBox.innerText = `현재 발언자: [ ${currentTurnPlayer} ]님`;
+            }
+
+            if (state.lastCalledWord) {
+                document.getElementById('broadcasterDisplay').innerHTML = `<div><strong>${state.lastCaller}</strong>님이 공유한 키워드:</div><div style="color:var(--gemini-blue); font-size:1.2rem; margin-top:5px;">'${state.lastCalledWord}'</div>`;
+            } else {
+                document.getElementById('broadcasterDisplay').innerText = "최근 공유된 키워드가 없습니다.";
+            }
+
+            if (state.isGameOver) {
+                document.getElementById('winnerOverlay').style.display = 'flex';
+                document.getElementById('winnerNameDisplay').innerText = state.winnerName;
+                gameRef.child('players').child(state.winnerName).child('board').once('value', (bSnap) => {
+                    const wBoard = bSnap.val();
+                    const wGrid = document.getElementById('winnerGrid'); wGrid.innerHTML = '';
+                    if(wBoard) { for(let i=0; i<25; i++) { const d = document.createElement('div'); d.className = wBoard[i].stamped ? 'w-cell stamped' : 'w-cell'; d.innerText = wBoard[i].text; wGrid.appendChild(d); }}
+                });
+            }
+        });
+
+        // [리더보드]
+        gameRef.child('players').on('value', (snapshot) => {
+            const players = snapshot.val();
+            const listObj = document.getElementById('playerList'); listObj.innerHTML = '';
+            turnOrderList.forEach(pName => {
+                if(!players[pName]) return;
+                const lines = players[pName].lines || 0;
+                const span = document.createElement('span');
+                span.className = (pName === currentTurnPlayer) ? "player-badge active-turn" : "player-badge";
+                span.innerText = `${pName} (${lines*20}%)`;
+                listObj.appendChild(span);
+            });
+        });
+        startChat();
+    }
+
+    // 빙고 계산기
+    function checkMyBingo(cells) {
+        if(cells.length < 25) return;
+        let lines = 0;
+        for (let r = 0; r < 5; r++) { if (cells[r*5].stamped && cells[r*5+1].stamped && cells[r*5+2].stamped && cells[r*5+3].stamped && cells[r*5+4].stamped) lines++; }
+        for (let c = 0; c < 5; c++) { if (cells[c].stamped && cells[c+5].stamped && cells[c+10].stamped && cells[c+15].stamped && cells[c+20].stamped) lines++; }
+        if (cells[0].stamped && cells[6].stamped && cells[12].stamped && cells[18].stamped && cells[24].stamped) lines++;
+        if (cells[4].stamped && cells[8].stamped && cells[12].stamped && cells[16].stamped && cells[20].stamped) lines++;
+        document.getElementById('myStatusText').innerText = `내 진행도: ${lines*20}% 완료`;
+        myBoardRef.update({ lines: lines });
+        if (lines >= 5) {
+            gameRef.child('state').once('value', snap => {
+                const st = snap.val();
+                if(!st || !st.isGameOver) {
+                    gameRef.child('state').update({ isGameOver: true, winnerName: myName });
+                    chatRef.push({ type: 'system', msg: `시스템 알림: [${myName}]님이 목표를 달성하여 세션이 종료됩니다.` });
+                }
+            });
+        }
+    }
+
+    // 채팅
+    function startChat() {
+        const chatBox = document.getElementById('chatMessages');
+        chatRef.on('child_added', (snap) => {
+            const data = snap.val();
+            const div = document.createElement('div');
+            if(data.type === 'system') {
+                div.className = 'chat-msg system'; div.innerText = data.msg;
+            } else {
+                div.className = data.sender === myName ? 'chat-msg mine' : 'chat-msg';
+                if(data.sender !== myName) {
+                    const nameLabel = document.createElement('div'); nameLabel.className = 'chat-sender'; nameLabel.innerText = data.sender; div.appendChild(nameLabel);
+                }
+                const bubble = document.createElement('div'); bubble.className = 'chat-bubble'; bubble.innerText = data.msg; div.appendChild(bubble);
+            }
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+    }
+    window.sendChat = function() {
+        const input = document.getElementById('chatInput'); const txt = input.value.trim();
+        if(txt) { chatRef.push({ type: 'user', sender: myName, msg: txt }); input.value = ''; }
+    }
+
+    // 초기화
+    window.resetAllGame = function() {
+        if(!confirm("현재 세션의 모든 데이터를 초기화하시겠습니까?")) return;
+        gameRef.remove().then(() => { location.reload(); });
+    }
+    function fillTestNumbers() { for(let i=0; i<25; i++) { document.getElementById(`input_cell_${i}`).value = "데이터_" + (i + 1); }}
+</script>
+</body>
+</html>
